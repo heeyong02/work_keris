@@ -1,0 +1,19 @@
+[server]
+headless = true
+maxUploadSize = 500
+enableXsrfProtection = false
+enableCORS = false
+fileWatcherType = "none"
+
+# 타임아웃 설정 (초 단위)
+maxMessageSize = 200
+
+[browser]
+gatherUsageStats = false
+serverAddress = "localhost"
+
+[runner]
+# 매직 명령어 사용 안 함 (성능 향상)
+magicEnabled = false
+# 스크립트 재실행 시간 제한 없음
+fastReruns = true

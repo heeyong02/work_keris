@@ -90,6 +90,7 @@ def remove_number_if_duplicate(df, col="교육과정"):
 
 
 # 교육과정별 대중소 계열별 비율 계산
+@st.cache_data
 def get_course_distribution(no_nce):
     """
     교육과정별 대중소 계열별 비율을 계산하는 함수
@@ -554,7 +555,7 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
 
             with col2:
                 st.markdown("#### 교육과정별 추천 결과")
-                excel_data2 = to_excel(merged_result)
+                excel_data2 = to_excel(merged_result) 
                 st.download_button(
                     label="📥 Excel 다운로드",
                     data=excel_data2,

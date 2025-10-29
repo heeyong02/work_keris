@@ -168,7 +168,7 @@ if load_button and uploaded_file1 and uploaded_file2:
     st.session_state.data_loaded = False  # 재처리 시작
 
 # === 데이터 처리 및 결과 표시 ===
-if st.session_state.data_loaded:
+if load_button and uploaded_file1 and uploaded_file2:
     if not st.session_state.data_loaded:
         try:
             data_loading_start_time = datetime.now()
@@ -457,10 +457,7 @@ if st.session_state.data_loaded:
                 'nce': nce,
                 'max_rank': max_rank
             }
-            if "data_loaded" not in st.session_state:
-                st.session_state.data_loaded = False
-            if "done" not in st.session_state:
-                st.session_state.done = False
+            st.session_state.data_loaded = True
 
             # 성공 메시지
             st.success("✅ 모든 처리가 완료되었습니다! 아래에서 결과를 확인하세요.")
@@ -471,92 +468,91 @@ if st.session_state.data_loaded:
             st.session_state.data_loaded = False
             st.stop()  # 에러 발생 시 여기서 멈춤
 
-    # 결과 표시 (데이터가 로드된 경우)
-    if st.session_state.data_loaded and st.session_state.results:
-        results = st.session_state.results
-        course_ratio_result_nce = results['course_ratio_result_nce']
-        merged_result = results['merged_result']
-        nce_keys = results['nce_keys']
-        nce = results['nce']
-        max_rank = results['max_rank']
+# 결과 표시 (데이터가 로드된 경우)
+if st.session_state.data_loaded and st.session_state.results:
+    results = st.session_state.results
+    course_ratio_result_nce = results['course_ratio_result_nce']
+    merged_result = results['merged_result']
+    nce_keys = results['nce_keys']
+    nce = results['nce']
+    max_rank = results['max_rank']
 
-        # === 결과 표시 ===
-        st.markdown("---")
-        st.header("📊 분석 결과")
+    # === 결과 표시 ===
+    st.markdown("---")
+    st.header("📊 분석 결과")
 
-        # 탭으로 구분
-        tab1, tab2, tab3 = st.tabs(
-            ["📈 통계 정보", "🎯 전공별 추천 결과", "📥 데이터 다운로드"]
-        )
+    # 탭으로 구분
+    tab1, tab2, tab3 = st.tabs(
+        ["📈 통계 정보", "🎯 전공별 추천 결과", "📥 데이터 다운로드"]
+    )
 
-        with tab1:
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("전체 전공 수", f"{len(nce_keys):,}개")
-            with col2:
-                st.metric("NCE 과목 수", f"{len(nce):,}개")
-            with col3:
-                st.metric("추천 결과 생성", f"{len(course_ratio_result_nce):,}건")
-            with col4:
-                st.metric("최대 추천 순위", f"{max_rank}순위")
+    with tab1:
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("전체 전공 수", f"{len(nce_keys):,}개")
+        with col2:
+            st.metric("NCE 과목 수", f"{len(nce):,}개")
+        with col3:
+            st.metric("추천 결과 생성", f"{len(course_ratio_result_nce):,}건")
+        with col4:
+            st.metric("최대 추천 순위", f"{max_rank}순위")
 
-            st.markdown("### 대계열 분포")
-            major_dist = nce["대계열분류"].value_counts()
-            st.bar_chart(major_dist)
+        st.markdown("### 대계열 분포")
+        major_dist = nce["대계열분류"].value_counts()
+        st.bar_chart(major_dist)
 
-        with tab2:
-            st.markdown("### 전공별 표준분류체계 추천 결과")
+    with tab2:
+        st.markdown("### 전공별 표준분류체계 추천 결과")
 
-            # 상위 5개 순위만 표시 (고정)
-            num_ranks = 5
-            display_cols = ["학교명", "학부·과(전공)명"]
-            for i in range(1, num_ranks + 1):
-                display_cols.append(f"추천_대중소_{i}순위")
-                display_cols.append(f"추천_확률_{i}순위")
+        # 상위 5개 순위만 표시 (고정)
+        num_ranks = 5
+        display_cols = ["학교명", "학부·과(전공)명"]
+        for i in range(1, num_ranks + 1):
+            display_cols.append(f"추천_대중소_{i}순위")
+            display_cols.append(f"추천_확률_{i}순위")
 
-            display_cols = [col for col in display_cols if col in course_ratio_result_nce.columns]
+        display_cols = [col for col in display_cols if col in course_ratio_result_nce.columns]
 
-            st.dataframe(course_ratio_result_nce[display_cols], use_container_width=True, height=500)
+        st.dataframe(course_ratio_result_nce[display_cols], use_container_width=True, height=500)
 
-            st.info(f"📌 총 {len(course_ratio_result_nce)}개 전공의 추천 결과 (상위 5순위 표시)")
+        st.info(f"📌 총 {len(course_ratio_result_nce)}개 전공의 추천 결과 (상위 5순위 표시)")
 
-        with tab3:
-            st.markdown("### 결과 다운로드")
+    with tab3:
+        st.markdown("### 결과 다운로드")
 
-            # Excel 다운로드 함수
-            def to_excel(df):
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                    df.to_excel(writer, index=False, sheet_name="추천결과")
-                return output.getvalue()
+        # Excel 다운로드 함수
+        def to_excel(df):
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                df.to_excel(writer, index=False, sheet_name="추천결과")
+            return output.getvalue()
 
-            col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2)
 
-            with col1:
-                st.markdown("#### 전공별 추천 결과")
-                excel_data1 = to_excel(course_ratio_result_nce)
-                st.download_button(
-                    label="📥 전공별 Excel 다운로드",
-                    data=excel_data1,
-                    file_name="nce_전공별_추천결과.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
-                st.caption(f"📊 {len(course_ratio_result_nce):,}개 전공")
+        with col1:
+            st.markdown("#### 전공별 추천 결과")
+            excel_data1 = to_excel(course_ratio_result_nce)
+            st.download_button(
+                label="📥 전공별 Excel 다운로드",
+                data=excel_data1,
+                file_name="nce_전공별_추천결과.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            st.caption(f"📊 {len(course_ratio_result_nce):,}개 전공")
 
-            with col2:
-                st.markdown("#### 교육과정별 추천 결과")
-                excel_data2 = to_excel(merged_result)
-                st.download_button(
-                    label="📥 교육과정별 Excel 다운로드",
-                    data=excel_data2,
-                    file_name="nce_교육과정별_추천결과.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
-                st.caption(f"📊 {len(merged_result):,}개 교육과정")
-    
+        with col2:
+            st.markdown("#### 교육과정별 추천 결과")
+            excel_data2 = to_excel(merged_result)
+            st.download_button(
+                label="📥 교육과정별 Excel 다운로드",
+                data=excel_data2,
+                file_name="nce_교육과정별_추천결과.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            st.caption(f"📊 {len(merged_result):,}개 교육과정")
 
-    else:
-        st.info("📥 두 파일을 업로드한 후, **'데이터 업로드 완료' 버튼**을 눌러주세요.")
+elif not st.session_state.data_loaded and uploaded_file1 and uploaded_file2:
+    st.info("📥 두 파일을 업로드한 후, **'데이터 업로드 완료' 버튼**을 눌러주세요.")
 else:
     st.info("👈 사이드바에서 필요한 파일을 업로드해주세요.")
 
@@ -594,5 +590,3 @@ st.markdown(
     "</div>",
     unsafe_allow_html=True,
 )
-if st.session_state.done:
-    st.stop()

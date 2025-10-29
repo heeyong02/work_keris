@@ -527,17 +527,29 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
                     df.to_excel(writer, index=False, sheet_name="추천결과")
                 return output.getvalue()
 
-            col1 = st.columns(2)
+            col1, col2 = st.columns(2)
 
             with col1:
                 st.markdown("#### 전공별 추천 결과")
-                excel_data = to_excel(course_ratio_result_nce)
+                excel_data1 = to_excel(course_ratio_result_nce)
                 st.download_button(
-                    label="📥 Excel 다운로드",
-                    data=excel_data,
+                    label="📥 전공별 Excel 다운로드",
+                    data=excel_data1,
                     file_name="nce_전공별_추천결과.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
+                st.caption(f"📊 {len(course_ratio_result_nce):,}개 전공")
+
+            with col2:
+                st.markdown("#### 교육과정별 추천 결과")
+                excel_data2 = to_excel(merged_result)
+                st.download_button(
+                    label="📥 교육과정별 Excel 다운로드",
+                    data=excel_data2,
+                    file_name="nce_교육과정별_추천결과.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+                st.caption(f"📊 {len(merged_result):,}개 교육과정")
 
     else:
         st.info("📥 두 파일을 업로드한 후, **'데이터 업로드 완료' 버튼**을 눌러주세요.")

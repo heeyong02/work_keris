@@ -385,7 +385,7 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
                     ]
                     long_list.append(sub)
 
-            melted = pd.concat( ignore_index=True).dropna(
+            melted = pd.concat(ignore_index=True).dropna(
                 subset=["대중소", "확률"]
             )
 

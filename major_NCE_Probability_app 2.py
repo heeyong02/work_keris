@@ -111,7 +111,7 @@ def get_course_distribution(no_nce):
     )
     return grouped
 
-
+@st.cache_data
 def load_file_by_extension(file, skiprows=None):
     """
     파일 확장자에 따라 적절한 방법으로 파일을 로드하는 함수
@@ -168,7 +168,7 @@ if load_button and uploaded_file1 and uploaded_file2:
     st.session_state.data_loaded = False  # 재처리 시작
 
 # === 데이터 처리 및 결과 표시 ===
-if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_loaded):
+if st.session_state.data_loaded:
     if not st.session_state.data_loaded:
         try:
             data_loading_start_time = datetime.now()
@@ -457,7 +457,10 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
                 'nce': nce,
                 'max_rank': max_rank
             }
-            st.session_state.data_loaded = True
+            if "data_loaded" not in st.session_state:
+                st.session_state.data_loaded = False
+            if "done" not in st.session_state:
+                st.session_state.done = False
 
             # 성공 메시지
             st.success("✅ 모든 처리가 완료되었습니다! 아래에서 결과를 확인하세요.")
@@ -550,7 +553,9 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
                 st.caption(f"📊 {len(merged_result):,}개 교육과정")
-
+    if st.session_state.done:
+        st.stop()
+        
     else:
         st.info("📥 두 파일을 업로드한 후, **'데이터 업로드 완료' 버튼**을 눌러주세요.")
 else:

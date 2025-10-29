@@ -461,7 +461,6 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
 
             # 성공 메시지
             st.success("✅ 모든 처리가 완료되었습니다! 아래에서 결과를 확인하세요.")
-            st.stop()
 
         except Exception as e:
             st.error(f"❌ 오류 발생: {str(e)}")
@@ -505,32 +504,18 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
         with tab2:
             st.markdown("### 전공별 표준분류체계 추천 결과")
 
-            # 학교명 필터
-            schools = sorted(course_ratio_result_nce["학교명"].unique())
-            selected_school = st.selectbox("학교 선택", ["전체"] + schools)
-
-            # 필터링
-            if selected_school != "전체":
-                display_df = course_ratio_result_nce[
-                    course_ratio_result_nce["학교명"] == selected_school
-                ]
-            else:
-                display_df = course_ratio_result_nce
-
-            # 표시할 순위 개수 선택
-            num_ranks = st.slider("표시할 추천 순위 개수", 1, 10, 5)
-
-            # 표시할 컬럼 선택
+            # 상위 5개 순위만 표시 (고정)
+            num_ranks = 5
             display_cols = ["학교명", "학부·과(전공)명"]
             for i in range(1, num_ranks + 1):
                 display_cols.append(f"추천_대중소_{i}순위")
                 display_cols.append(f"추천_확률_{i}순위")
 
-            display_cols = [col for col in display_cols if col in display_df.columns]
+            display_cols = [col for col in display_cols if col in course_ratio_result_nce.columns]
 
-            st.dataframe(display_df[display_cols], use_container_width=True, height=500)
+            st.dataframe(course_ratio_result_nce[display_cols], use_container_width=True, height=500)
 
-            st.info(f"📌 총 {len(display_df)}개 전공의 추천 결과")
+            st.info(f"📌 총 {len(course_ratio_result_nce)}개 전공의 추천 결과 (상위 5순위 표시)")
 
         with tab3:
             st.markdown("### 결과 다운로드")

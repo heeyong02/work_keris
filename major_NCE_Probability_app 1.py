@@ -182,13 +182,11 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
             logger.info(f"데이터 로딩 완료 시간: {data_loading_time}")
 
             # 진행 상황 표시
-            progress_bar = st.progress(0)
-            status_text = st.empty()
+            progress_bar = st.progress(0, text="데이터 처리 중...")
 
             # Step 1: 컬럼 이름 변경
-            status_text.text("1/7 컬럼 이름 변경 중...")
             data_processing_start_time = datetime.now()
-            progress_bar.progress(10)
+            progress_bar.progress(10, text="1/7 컬럼 이름 변경 중...")
 
             df2 = df2.rename(
                 columns={
@@ -205,8 +203,7 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
             logger.info(f"컬럼 이름 변경 완료 시간: {column_name_change_time}")
 
             # Step 2: 데이터 병합
-            status_text.text("2/7 데이터 전처리 및 병합 중...")
-            progress_bar.progress(20)
+            progress_bar.progress(20, text="2/7 데이터 전처리 및 병합 중...")
 
             data_processing_start_time = datetime.now()
             for df in [df1, df2]:
@@ -233,8 +230,7 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
             logger.info(f"데이터 처리 완료 시간: {data_processing_time}")
 
             # Step 3: 교육과정 정제
-            status_text.text("3/7 교육과정 이름 정제 중...")
-            progress_bar.progress(40)
+            progress_bar.progress(40, text="3/7 교육과정 이름 정제 중...")
             education_program_correction_start_time = datetime.now()
             merged["표본수 n"] = (
                 merged.groupby("교육과정")["교육과정"].transform("count").astype("Int64")
@@ -250,8 +246,7 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
             all_code = merged.copy()
 
             # Step 4: NCE 필터링
-            status_text.text("4/7 NCE 데이터 필터링 중...")
-            progress_bar.progress(50)
+            progress_bar.progress(50, text="4/7 NCE 데이터 필터링 중...")
             nce_filtering_start_time = datetime.now()
             df_nce = merged[
                 (merged["대학구분"] == "대학")
@@ -287,8 +282,7 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
             no_nce = no_nce.drop(columns=["Unnamed: 0"], errors="ignore")
 
             # Step 5: 교육과정별 비율 계산
-            status_text.text("5/7 교육과정별 분류 비율 계산 중...")
-            progress_bar.progress(60)
+            progress_bar.progress(60, text="5/7 교육과정별 분류 비율 계산 중...")
             course_distribution_calculation_start_time = datetime.now()
             grouped = get_course_distribution(no_nce)
             course_ratio = grouped.copy()
@@ -301,8 +295,7 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
             )
 
             # Step 6: 추천 결과 생성
-            status_text.text("6/7 추천 결과 생성 중...")
-            progress_bar.progress(75)
+            progress_bar.progress(75, text="6/7 추천 결과 생성 중...")
             recommendation_result_generation_start_time = datetime.now()
             course_ratio["추천_대중소"] = (
                 course_ratio["대계열분류"].astype(str)
@@ -344,8 +337,7 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
             )
 
             # Step 7: 전공별 추천 생성
-            status_text.text("7/7 전공별 추천 결과 생성 중...")
-            progress_bar.progress(90)
+            progress_bar.progress(90, text="7/7 전공별 추천 결과 생성 중...")
             major_recommendation_generation_start_time = datetime.now()
             nce_keys = nce[["학교명", "학부·과(전공)명"]].drop_duplicates()
             all_code_final = merged_result.merge(
@@ -396,25 +388,18 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
                 subset=["대중소", "확률"]
             )
 
-            agg = (
-                melted.groupby(
-                    ["학교명", "학부·과(전공)명", "교육과정", "대중소"], as_index=False
-                )
-                .apply(
-                    lambda g: (g["확률"] * g["표본수"]).sum() / g["표본수"].sum(),
-                    include_groups=False,
-                )
-                .reset_index()
-            )
-            agg.columns = [
-                "_",
-                "학교명",
-                "학부·과(전공)명",
-                "교육과정",
-                "대중소",
-                "가중확률",
-            ]
-            agg = agg.drop(columns="_")
+            # 벡터화된 연산으로 최적화 (apply 대신)
+            melted['가중값'] = melted['확률'] * melted['표본수']
+
+            grouped = melted.groupby(
+                ["학교명", "학부·과(전공)명", "교육과정", "대중소"]
+            ).agg({
+                '가중값': 'sum',
+                '표본수': 'sum'
+            }).reset_index()
+
+            grouped['가중확률'] = grouped['가중값'] / grouped['표본수']
+            agg = grouped[["학교명", "학부·과(전공)명", "교육과정", "대중소", "가중확률"]].copy()
 
             summed = agg.groupby(["학교명", "학부·과(전공)명", "대중소"], as_index=False)[
                 "가중확률"
@@ -461,8 +446,7 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
             )
             logger.info(f"전체 처리 완료 시간: {datetime.now() - data_loading_start_time}")
 
-            progress_bar.progress(100)
-            status_text.text("✅ 처리 완료!")
+            progress_bar.progress(100, text="✅ 처리 완료!")
 
             # 결과를 session_state에 저장
             st.session_state.results = {
@@ -474,10 +458,14 @@ if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_l
             }
             st.session_state.data_loaded = True
 
+            # 성공 메시지
+            st.success("✅ 모든 처리가 완료되었습니다! 아래에서 결과를 확인하세요.")
+
         except Exception as e:
             st.error(f"❌ 오류 발생: {str(e)}")
             st.exception(e)
             st.session_state.data_loaded = False
+            st.stop()  # 에러 발생 시 여기서 멈춤
 
     # 결과 표시 (데이터가 로드된 경우)
     if st.session_state.data_loaded and st.session_state.results:

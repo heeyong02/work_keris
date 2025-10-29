@@ -153,12 +153,22 @@ def upload_file(label, key):
 uploaded_file1 = upload_file("학교별 교육편제단위 정보 파일 (Excel/Parquet/csv)", "file1")
 uploaded_file2 = upload_file("교육과정_대학 파일 (Excel/Parquet/csv)", "file2")
 
+# === session_state 초기화 ===
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = False
+if 'results' not in st.session_state:
+    st.session_state.results = None
+
 # === 업로드 완료 버튼 추가 ===
 load_button = st.sidebar.button("📤 데이터 업로드 완료")
 
+# 버튼이 눌리면 데이터 로드 시작
+if load_button and uploaded_file1 and uploaded_file2:
+    st.session_state.data_loaded = False  # 재처리 시작
+
 # === 데이터 처리 및 결과 표시 ===
-if uploaded_file1 and uploaded_file2:
-    if load_button:
+if uploaded_file1 and uploaded_file2 and (load_button or st.session_state.data_loaded):
+    if not st.session_state.data_loaded:
         try:
             data_loading_start_time = datetime.now()
             with st.spinner("📊 데이터를 로딩하는 중..."):
@@ -454,96 +464,115 @@ if uploaded_file1 and uploaded_file2:
             progress_bar.progress(100)
             status_text.text("✅ 처리 완료!")
 
-            # === 결과 표시 ===
-            st.markdown("---")
-            st.header("📊 분석 결과")
-
-            # 탭으로 구분
-            tab1, tab2, tab3 = st.tabs(
-                ["📈 통계 정보", "🎯 전공별 추천 결과", "📥 데이터 다운로드"]
-            )
-
-            with tab1:
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("전체 전공 수", f"{len(nce_keys):,}개")
-                with col2:
-                    st.metric("NCE 과목 수", f"{len(nce):,}개")
-                with col3:
-                    st.metric("추천 결과 생성", f"{len(course_ratio_result_nce):,}건")
-                with col4:
-                    st.metric("최대 추천 순위", f"{max_rank}순위")
-
-                st.markdown("### 대계열 분포")
-                major_dist = nce["대계열분류"].value_counts()
-                st.bar_chart(major_dist)
-
-            with tab2:
-                st.markdown("### 전공별 표준분류체계 추천 결과")
-
-                # 학교명 필터
-                schools = sorted(course_ratio_result_nce["학교명"].unique())
-                selected_school = st.selectbox("학교 선택", ["전체"] + schools)
-
-                # 필터링
-                if selected_school != "전체":
-                    display_df = course_ratio_result_nce[
-                        course_ratio_result_nce["학교명"] == selected_school
-                    ]
-                else:
-                    display_df = course_ratio_result_nce
-
-                # 표시할 순위 개수 선택
-                num_ranks = st.slider("표시할 추천 순위 개수", 1, 10, 5)
-
-                # 표시할 컬럼 선택
-                display_cols = ["학교명", "학부·과(전공)명"]
-                for i in range(1, num_ranks + 1):
-                    display_cols.append(f"추천_대중소_{i}순위")
-                    display_cols.append(f"추천_확률_{i}순위")
-
-                display_cols = [col for col in display_cols if col in display_df.columns]
-
-                st.dataframe(display_df[display_cols], use_container_width=True, height=500)
-
-                st.info(f"📌 총 {len(display_df)}개 전공의 추천 결과")
-
-            with tab3:
-                st.markdown("### 결과 다운로드")
-
-                # Excel 다운로드 함수
-                def to_excel(df):
-                    output = BytesIO()
-                    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                        df.to_excel(writer, index=False, sheet_name="추천결과")
-                    return output.getvalue()
-
-                col1, col2 = st.columns(2)
-
-                with col1:
-                    st.markdown("#### 전공별 추천 결과")
-                    excel_data = to_excel(course_ratio_result_nce)
-                    st.download_button(
-                        label="📥 Excel 다운로드",
-                        data=excel_data,
-                        file_name="nce_전공별_추천결과.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    )
-
-                with col2:
-                    st.markdown("#### 교육과정별 추천 결과")
-                    excel_data2 = to_excel(merged_result)
-                    st.download_button(
-                        label="📥 Excel 다운로드",
-                        data=excel_data2,
-                        file_name="nce_교육과정별_추천결과.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    )
+            # 결과를 session_state에 저장
+            st.session_state.results = {
+                'course_ratio_result_nce': course_ratio_result_nce,
+                'merged_result': merged_result,
+                'nce_keys': nce_keys,
+                'nce': nce,
+                'max_rank': max_rank
+            }
+            st.session_state.data_loaded = True
 
         except Exception as e:
             st.error(f"❌ 오류 발생: {str(e)}")
             st.exception(e)
+            st.session_state.data_loaded = False
 
+    # 결과 표시 (데이터가 로드된 경우)
+    if st.session_state.data_loaded and st.session_state.results:
+        results = st.session_state.results
+        course_ratio_result_nce = results['course_ratio_result_nce']
+        merged_result = results['merged_result']
+        nce_keys = results['nce_keys']
+        nce = results['nce']
+        max_rank = results['max_rank']
+
+        # === 결과 표시 ===
+        st.markdown("---")
+        st.header("📊 분석 결과")
+
+        # 탭으로 구분
+        tab1, tab2, tab3 = st.tabs(
+            ["📈 통계 정보", "🎯 전공별 추천 결과", "📥 데이터 다운로드"]
+        )
+
+        with tab1:
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("전체 전공 수", f"{len(nce_keys):,}개")
+            with col2:
+                st.metric("NCE 과목 수", f"{len(nce):,}개")
+            with col3:
+                st.metric("추천 결과 생성", f"{len(course_ratio_result_nce):,}건")
+            with col4:
+                st.metric("최대 추천 순위", f"{max_rank}순위")
+
+            st.markdown("### 대계열 분포")
+            major_dist = nce["대계열분류"].value_counts()
+            st.bar_chart(major_dist)
+
+        with tab2:
+            st.markdown("### 전공별 표준분류체계 추천 결과")
+
+            # 학교명 필터
+            schools = sorted(course_ratio_result_nce["학교명"].unique())
+            selected_school = st.selectbox("학교 선택", ["전체"] + schools)
+
+            # 필터링
+            if selected_school != "전체":
+                display_df = course_ratio_result_nce[
+                    course_ratio_result_nce["학교명"] == selected_school
+                ]
+            else:
+                display_df = course_ratio_result_nce
+
+            # 표시할 순위 개수 선택
+            num_ranks = st.slider("표시할 추천 순위 개수", 1, 10, 5)
+
+            # 표시할 컬럼 선택
+            display_cols = ["학교명", "학부·과(전공)명"]
+            for i in range(1, num_ranks + 1):
+                display_cols.append(f"추천_대중소_{i}순위")
+                display_cols.append(f"추천_확률_{i}순위")
+
+            display_cols = [col for col in display_cols if col in display_df.columns]
+
+            st.dataframe(display_df[display_cols], use_container_width=True, height=500)
+
+            st.info(f"📌 총 {len(display_df)}개 전공의 추천 결과")
+
+        with tab3:
+            st.markdown("### 결과 다운로드")
+
+            # Excel 다운로드 함수
+            def to_excel(df):
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                    df.to_excel(writer, index=False, sheet_name="추천결과")
+                return output.getvalue()
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.markdown("#### 전공별 추천 결과")
+                excel_data = to_excel(course_ratio_result_nce)
+                st.download_button(
+                    label="📥 Excel 다운로드",
+                    data=excel_data,
+                    file_name="nce_전공별_추천결과.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+
+            with col2:
+                st.markdown("#### 교육과정별 추천 결과")
+                excel_data2 = to_excel(merged_result)
+                st.download_button(
+                    label="📥 Excel 다운로드",
+                    data=excel_data2,
+                    file_name="nce_교육과정별_추천결과.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
     else:
         st.info("📥 두 파일을 업로드한 후, **'데이터 업로드 완료' 버튼**을 눌러주세요.")
 else:

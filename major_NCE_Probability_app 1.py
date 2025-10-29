@@ -153,24 +153,28 @@ def upload_file(label, key):
 uploaded_file1 = upload_file("학교별 교육편제단위 정보 파일 (Excel/Parquet/csv)", "file1")
 uploaded_file2 = upload_file("교육과정_대학 파일 (Excel/Parquet/csv)", "file2")
 
+# === 업로드 완료 버튼 추가 ===
+load_button = st.sidebar.button("📤 데이터 업로드 완료")
 
 # === 데이터 처리 및 결과 표시 ===
 if uploaded_file1 and uploaded_file2:
-    try:
-        data_loading_start_time = datetime.now()
-        with st.spinner("📊 데이터를 로딩하는 중..."):
-            # 데이터 로드
-            df1 = load_file_by_extension(uploaded_file1, skiprows=4)
-            df2 = load_file_by_extension(uploaded_file2, skiprows=8)
+    if load_button:
+        try:
+            data_loading_start_time = datetime.now()
+            with st.spinner("📊 데이터를 로딩하는 중..."):
+                # 데이터 로드
+                df1 = load_file_by_extension(uploaded_file1, skiprows=4)
+                df2 = load_file_by_extension(uploaded_file2, skiprows=8)
+                st.success("✅ 데이터 로딩 완료!")
 
-            st.success("✅ 데이터 로딩 완료!")
+            # 이후 Step 1 ~ Step 7 전부 여기에 포함!
+            data_loading_time = datetime.now() - data_loading_start_time
+            logger.info(f"데이터 로딩 완료 시간: {data_loading_time}")
 
-        data_loading_time = datetime.now() - data_loading_start_time
-        logger.info(f"데이터 로딩 완료 시간: {data_loading_time}")
+            # 진행 상황 표시
+            progress_bar = st.progress(0)
+            status_text = st.empty()
 
-        # 진행 상황 표시
-        progress_bar = st.progress(0)
-        status_text = st.empty()
 
         # Step 1: 컬럼 이름 변경
         status_text.text("1/7 컬럼 이름 변경 중...")
@@ -537,12 +541,13 @@ if uploaded_file1 and uploaded_file2:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
 
-    except Exception as e:
-        st.error(f"❌ 오류 발생: {str(e)}")
-        st.exception(e)
+        except Exception as e:
+            st.error(f"❌ 오류 발생: {str(e)}")
+            st.exception(e)
 
+    else:
+        st.info("📥 두 파일을 업로드한 후, **'데이터 업로드 완료' 버튼**을 눌러주세요.")
 else:
-    # 안내 메시지
     st.info("👈 사이드바에서 필요한 파일을 업로드해주세요.")
 
     st.markdown("""

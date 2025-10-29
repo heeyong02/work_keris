@@ -553,9 +553,8 @@ if st.session_state.data_loaded:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
                 st.caption(f"📊 {len(merged_result):,}개 교육과정")
-    if st.session_state.done:
-        st.stop()
-        
+    
+
     else:
         st.info("📥 두 파일을 업로드한 후, **'데이터 업로드 완료' 버튼**을 눌러주세요.")
 else:
@@ -595,3 +594,5 @@ st.markdown(
     "</div>",
     unsafe_allow_html=True,
 )
+if st.session_state.done:
+    st.stop()

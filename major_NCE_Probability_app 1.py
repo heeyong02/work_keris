@@ -175,371 +175,370 @@ if uploaded_file1 and uploaded_file2:
             progress_bar = st.progress(0)
             status_text = st.empty()
 
+            # Step 1: 컬럼 이름 변경
+            status_text.text("1/7 컬럼 이름 변경 중...")
+            data_processing_start_time = datetime.now()
+            progress_bar.progress(10)
 
-        # Step 1: 컬럼 이름 변경
-        status_text.text("1/7 컬럼 이름 변경 중...")
-        data_processing_start_time = datetime.now()
-        progress_bar.progress(10)
-
-        df2 = df2.rename(
-            columns={
-                "차수": "조사차수",
-                "본분교명": "대학구분",
-                "학교구분": "본분교",
-                "학부·과(전공)코드": "학교별학과코드",
-                "주야구분명": "주야간구분",
-                "학부특성명": "학과특성",
-            }
-        )
-
-        column_name_change_time = datetime.now() - data_processing_start_time
-        logger.info(f"컬럼 이름 변경 완료 시간: {column_name_change_time}")
-
-        # Step 2: 데이터 병합
-        status_text.text("2/7 데이터 전처리 및 병합 중...")
-        progress_bar.progress(20)
-
-        data_processing_start_time = datetime.now()
-        for df in [df1, df2]:
-            df["학교코드"] = df["학교코드"].astype(str).str.strip()
-            df["학교별학과코드"] = df["학교별학과코드"].astype(str).str.strip()
-            df["학부·과(전공)명"] = (
-                df["학부·과(전공)명"].astype(str).str.replace(r"\s+", "", regex=True)
+            df2 = df2.rename(
+                columns={
+                    "차수": "조사차수",
+                    "본분교명": "대학구분",
+                    "학교구분": "본분교",
+                    "학부·과(전공)코드": "학교별학과코드",
+                    "주야구분명": "주야간구분",
+                    "학부특성명": "학과특성",
+                }
             )
 
-        attach_cols = ["교육과정", "이수구분", "학점", "교과목해설"]
-        df2_slim = df2[
-            ["학교코드", "학교별학과코드", "학부·과(전공)명"] + attach_cols
-        ].copy()
+            column_name_change_time = datetime.now() - data_processing_start_time
+            logger.info(f"컬럼 이름 변경 완료 시간: {column_name_change_time}")
 
-        merged = pd.merge(
-            df1,
-            df2_slim,
-            on=["학교코드", "학교별학과코드", "학부·과(전공)명"],
-            how="left",
-            validate="1:m",
-        )
+            # Step 2: 데이터 병합
+            status_text.text("2/7 데이터 전처리 및 병합 중...")
+            progress_bar.progress(20)
 
-        data_processing_time = datetime.now() - data_processing_start_time
-        logger.info(f"데이터 처리 완료 시간: {data_processing_time}")
+            data_processing_start_time = datetime.now()
+            for df in [df1, df2]:
+                df["학교코드"] = df["학교코드"].astype(str).str.strip()
+                df["학교별학과코드"] = df["학교별학과코드"].astype(str).str.strip()
+                df["학부·과(전공)명"] = (
+                    df["학부·과(전공)명"].astype(str).str.replace(r"\s+", "", regex=True)
+                )
 
-        # Step 3: 교육과정 정제
-        status_text.text("3/7 교육과정 이름 정제 중...")
-        progress_bar.progress(40)
-        education_program_correction_start_time = datetime.now()
-        merged["표본수 n"] = (
-            merged.groupby("교육과정")["교육과정"].transform("count").astype("Int64")
-        )
+            attach_cols = ["교육과정", "이수구분", "학점", "교과목해설"]
+            df2_slim = df2[
+                ["학교코드", "학교별학과코드", "학부·과(전공)명"] + attach_cols
+            ].copy()
 
-        education_program_correction_time = (
-            datetime.now() - education_program_correction_start_time
-        )
-        logger.info(
-            f"교육과정 이름 정제 완료 시간: {education_program_correction_time}"
-        )
+            merged = pd.merge(
+                df1,
+                df2_slim,
+                on=["학교코드", "학교별학과코드", "학부·과(전공)명"],
+                how="left",
+                validate="1:m",
+            )
 
-        all_code = merged.copy()
+            data_processing_time = datetime.now() - data_processing_start_time
+            logger.info(f"데이터 처리 완료 시간: {data_processing_time}")
 
-        # Step 4: NCE 필터링
-        status_text.text("4/7 NCE 데이터 필터링 중...")
-        progress_bar.progress(50)
-        nce_filtering_start_time = datetime.now()
-        df_nce = merged[
-            (merged["대학구분"] == "대학")
-            & (merged["학교구분"] == "대학교")
-            & (merged["본분교"] == "본교")
-            & (merged["(대학)지역"] == "서울")
-            & (merged["주야간구분"] == "주간")
-            & (merged["학과특성"] == "일반과정")
-            & (merged["학과상태"] != "폐지")
-            & (merged["수업연한"] == "4년")
-        ].copy()
-        nce_filtering_time = datetime.now() - nce_filtering_start_time
-        logger.info(f"NCE 필터링 완료 시간: {nce_filtering_time}")
+            # Step 3: 교육과정 정제
+            status_text.text("3/7 교육과정 이름 정제 중...")
+            progress_bar.progress(40)
+            education_program_correction_start_time = datetime.now()
+            merged["표본수 n"] = (
+                merged.groupby("교육과정")["교육과정"].transform("count").astype("Int64")
+            )
 
-        all_code = all_code.dropna(subset=["교육과정"])
-        df_nce = df_nce.replace("N.C.E.", "N.C.E", regex=False)
-        df_nce = df_nce.drop(columns=["Unnamed: 0"], errors="ignore")
+            education_program_correction_time = (
+                datetime.now() - education_program_correction_start_time
+            )
+            logger.info(
+                f"교육과정 이름 정제 완료 시간: {education_program_correction_time}"
+            )
 
-        nce = df_nce[
-            (df_nce["대계열분류"] == "N.C.E")
-            | (df_nce["중계열분류"] == "N.C.E")
-            | (df_nce["소계열분류"] == "N.C.E")
-            | (df_nce["대계열분류"] == "광역계열")
-        ]
+            all_code = merged.copy()
 
-        no_nce = all_code[
-            (all_code["대계열분류"] != "N.C.E")
-            & (all_code["중계열분류"] != "N.C.E")
-            & (all_code["소계열분류"] != "N.C.E")
-            & (all_code["소계열분류"] != "N.C.E.")
-        ]
-        no_nce = no_nce[no_nce["교육과정"] != "nan"]
-        no_nce = no_nce.drop(columns=["Unnamed: 0"], errors="ignore")
+            # Step 4: NCE 필터링
+            status_text.text("4/7 NCE 데이터 필터링 중...")
+            progress_bar.progress(50)
+            nce_filtering_start_time = datetime.now()
+            df_nce = merged[
+                (merged["대학구분"] == "대학")
+                & (merged["학교구분"] == "대학교")
+                & (merged["본분교"] == "본교")
+                & (merged["(대학)지역"] == "서울")
+                & (merged["주야간구분"] == "주간")
+                & (merged["학과특성"] == "일반과정")
+                & (merged["학과상태"] != "폐지")
+                & (merged["수업연한"] == "4년")
+            ].copy()
+            nce_filtering_time = datetime.now() - nce_filtering_start_time
+            logger.info(f"NCE 필터링 완료 시간: {nce_filtering_time}")
 
-        # Step 5: 교육과정별 비율 계산
-        status_text.text("5/7 교육과정별 분류 비율 계산 중...")
-        progress_bar.progress(60)
-        course_distribution_calculation_start_time = datetime.now()
-        grouped = get_course_distribution(no_nce)
-        course_ratio = grouped.copy()
-        course_ratio = course_ratio.replace("N.C.E.", "N.C.E", regex=False)
-        course_distribution_calculation_time = (
-            datetime.now() - course_distribution_calculation_start_time
-        )
-        logger.info(
-            f"교육과정별 분류 비율 계산 완료 시간: {course_distribution_calculation_time}"
-        )
+            all_code = all_code.dropna(subset=["교육과정"])
+            df_nce = df_nce.replace("N.C.E.", "N.C.E", regex=False)
+            df_nce = df_nce.drop(columns=["Unnamed: 0"], errors="ignore")
 
-        # Step 6: 추천 결과 생성
-        status_text.text("6/7 추천 결과 생성 중...")
-        progress_bar.progress(75)
-        recommendation_result_generation_start_time = datetime.now()
-        course_ratio["추천_대중소"] = (
-            course_ratio["대계열분류"].astype(str)
-            + "-"
-            + course_ratio["중계열분류"].astype(str)
-            + "-"
-            + course_ratio["소계열분류"].astype(str)
-        )
+            nce = df_nce[
+                (df_nce["대계열분류"] == "N.C.E")
+                | (df_nce["중계열분류"] == "N.C.E")
+                | (df_nce["소계열분류"] == "N.C.E")
+                | (df_nce["대계열분류"] == "광역계열")
+            ]
 
-        target_courses = nce["교육과정"].unique()
-        filtered = course_ratio[course_ratio["교육과정"].isin(target_courses)].copy()
-        filtered = filtered.sort_values(["교육과정", "비율"], ascending=[True, False])
-        filtered["추천순위"] = filtered.groupby("교육과정").cumcount() + 1
+            no_nce = all_code[
+                (all_code["대계열분류"] != "N.C.E")
+                & (all_code["중계열분류"] != "N.C.E")
+                & (all_code["소계열분류"] != "N.C.E")
+                & (all_code["소계열분류"] != "N.C.E.")
+            ]
+            no_nce = no_nce[no_nce["교육과정"] != "nan"]
+            no_nce = no_nce.drop(columns=["Unnamed: 0"], errors="ignore")
 
-        pivoted = filtered.pivot(
-            index="교육과정", columns="추천순위", values=["추천_대중소", "비율"]
-        ).sort_index(axis=1, level=1)
+            # Step 5: 교육과정별 비율 계산
+            status_text.text("5/7 교육과정별 분류 비율 계산 중...")
+            progress_bar.progress(60)
+            course_distribution_calculation_start_time = datetime.now()
+            grouped = get_course_distribution(no_nce)
+            course_ratio = grouped.copy()
+            course_ratio = course_ratio.replace("N.C.E.", "N.C.E", regex=False)
+            course_distribution_calculation_time = (
+                datetime.now() - course_distribution_calculation_start_time
+            )
+            logger.info(
+                f"교육과정별 분류 비율 계산 완료 시간: {course_distribution_calculation_time}"
+            )
 
-        new_cols = []
-        max_rank = filtered["추천순위"].max()
-        for i in range(1, max_rank + 1):
-            new_cols.append(("추천_대중소", i))
-            new_cols.append(("비율", i))
-        pivoted = pivoted[new_cols]
+            # Step 6: 추천 결과 생성
+            status_text.text("6/7 추천 결과 생성 중...")
+            progress_bar.progress(75)
+            recommendation_result_generation_start_time = datetime.now()
+            course_ratio["추천_대중소"] = (
+                course_ratio["대계열분류"].astype(str)
+                + "-"
+                + course_ratio["중계열분류"].astype(str)
+                + "-"
+                + course_ratio["소계열분류"].astype(str)
+            )
 
-        pivoted.columns = [
-            f"대중소_{col[1]}순위{'_확률' if col[0] == '비율' else ''}"
-            for col in pivoted.columns
-        ]
-        pivoted = pivoted.reset_index()
+            target_courses = nce["교육과정"].unique()
+            filtered = course_ratio[course_ratio["교육과정"].isin(target_courses)].copy()
+            filtered = filtered.sort_values(["교육과정", "비율"], ascending=[True, False])
+            filtered["추천순위"] = filtered.groupby("교육과정").cumcount() + 1
 
-        merged_result = df_nce.merge(pivoted, how="left")
+            pivoted = filtered.pivot(
+                index="교육과정", columns="추천순위", values=["추천_대중소", "비율"]
+            ).sort_index(axis=1, level=1)
 
-        recommendation_result_generation_time = (
-            datetime.now() - recommendation_result_generation_start_time
-        )
-        logger.info(
-            f"추천 결과 생성 완료 시간: {recommendation_result_generation_time}"
-        )
+            new_cols = []
+            max_rank = filtered["추천순위"].max()
+            for i in range(1, max_rank + 1):
+                new_cols.append(("추천_대중소", i))
+                new_cols.append(("비율", i))
+            pivoted = pivoted[new_cols]
 
-        # Step 7: 전공별 추천 생성
-        status_text.text("7/7 전공별 추천 결과 생성 중...")
-        progress_bar.progress(90)
-        major_recommendation_generation_start_time = datetime.now()
-        nce_keys = nce[["학교명", "학부·과(전공)명"]].drop_duplicates()
-        all_code_final = merged_result.merge(
-            nce_keys, on=["학교명", "학부·과(전공)명"], how="inner"
-        )
+            pivoted.columns = [
+                f"대중소_{col[1]}순위{'_확률' if col[0] == '비율' else ''}"
+                for col in pivoted.columns
+            ]
+            pivoted = pivoted.reset_index()
 
-        all_code_final["표본수 n"] = pd.to_numeric(
-            all_code_final["표본수 n"], errors="coerce"
-        ).fillna(1)
+            merged_result = df_nce.merge(pivoted, how="left")
 
-        rank_cols = [
-            c
-            for c in all_code_final.columns
-            if c.startswith("대중소_") and not c.endswith("_확률")
-        ]
-        prob_cols = [
-            c
-            for c in all_code_final.columns
-            if c.startswith("대중소_") and c.endswith("_확률")
-        ]
+            recommendation_result_generation_time = (
+                datetime.now() - recommendation_result_generation_start_time
+            )
+            logger.info(
+                f"추천 결과 생성 완료 시간: {recommendation_result_generation_time}"
+            )
 
-        long_list = []
-        for i in range(1, len(rank_cols) + 1):
-            cat_col = f"대중소_{i}순위"
-            prob_col = f"대중소_{i}순위_확률"
-            if cat_col in all_code_final.columns and prob_col in all_code_final.columns:
-                sub = all_code_final[
-                    [
+            # Step 7: 전공별 추천 생성
+            status_text.text("7/7 전공별 추천 결과 생성 중...")
+            progress_bar.progress(90)
+            major_recommendation_generation_start_time = datetime.now()
+            nce_keys = nce[["학교명", "학부·과(전공)명"]].drop_duplicates()
+            all_code_final = merged_result.merge(
+                nce_keys, on=["학교명", "학부·과(전공)명"], how="inner"
+            )
+
+            all_code_final["표본수 n"] = pd.to_numeric(
+                all_code_final["표본수 n"], errors="coerce"
+            ).fillna(1)
+
+            rank_cols = [
+                c
+                for c in all_code_final.columns
+                if c.startswith("대중소_") and not c.endswith("_확률")
+            ]
+            prob_cols = [
+                c
+                for c in all_code_final.columns
+                if c.startswith("대중소_") and c.endswith("_확률")
+            ]
+
+            long_list = []
+            for i in range(1, len(rank_cols) + 1):
+                cat_col = f"대중소_{i}순위"
+                prob_col = f"대중소_{i}순위_확률"
+                if cat_col in all_code_final.columns and prob_col in all_code_final.columns:
+                    sub = all_code_final[
+                        [
+                            "학교명",
+                            "학부·과(전공)명",
+                            "교육과정",
+                            "표본수 n",
+                            cat_col,
+                            prob_col,
+                        ]
+                    ].copy()
+                    sub.columns = [
                         "학교명",
                         "학부·과(전공)명",
                         "교육과정",
-                        "표본수 n",
-                        cat_col,
-                        prob_col,
+                        "표본수",
+                        "대중소",
+                        "확률",
                     ]
-                ].copy()
-                sub.columns = [
-                    "학교명",
-                    "학부·과(전공)명",
-                    "교육과정",
-                    "표본수",
-                    "대중소",
-                    "확률",
-                ]
-                long_list.append(sub)
+                    long_list.append(sub)
 
-        melted = pd.concat(long_list, ignore_index=True).dropna(
-            subset=["대중소", "확률"]
-        )
-
-        agg = (
-            melted.groupby(
-                ["학교명", "학부·과(전공)명", "교육과정", "대중소"], as_index=False
+            melted = pd.concat(long_list, ignore_index=True).dropna(
+                subset=["대중소", "확률"]
             )
-            .apply(
-                lambda g: (g["확률"] * g["표본수"]).sum() / g["표본수"].sum(),
-                include_groups=False,
+
+            agg = (
+                melted.groupby(
+                    ["학교명", "학부·과(전공)명", "교육과정", "대중소"], as_index=False
+                )
+                .apply(
+                    lambda g: (g["확률"] * g["표본수"]).sum() / g["표본수"].sum(),
+                    include_groups=False,
+                )
+                .reset_index()
             )
-            .reset_index()
-        )
-        agg.columns = [
-            "_",
-            "학교명",
-            "학부·과(전공)명",
-            "교육과정",
-            "대중소",
-            "가중확률",
-        ]
-        agg = agg.drop(columns="_")
+            agg.columns = [
+                "_",
+                "학교명",
+                "학부·과(전공)명",
+                "교육과정",
+                "대중소",
+                "가중확률",
+            ]
+            agg = agg.drop(columns="_")
 
-        summed = agg.groupby(["학교명", "학부·과(전공)명", "대중소"], as_index=False)[
-            "가중확률"
-        ].sum()
+            summed = agg.groupby(["학교명", "학부·과(전공)명", "대중소"], as_index=False)[
+                "가중확률"
+            ].sum()
 
-        summed["정규화확률"] = summed.groupby(["학교명", "학부·과(전공)명"])[
-            "가중확률"
-        ].transform(lambda x: x / x.sum())
+            summed["정규화확률"] = summed.groupby(["학교명", "학부·과(전공)명"])[
+                "가중확률"
+            ].transform(lambda x: x / x.sum())
 
-        summed["순위"] = (
-            summed.groupby(["학교명", "학부·과(전공)명"])["정규화확률"]
-            .rank(method="first", ascending=False)
-            .astype(int)
-        )
+            summed["순위"] = (
+                summed.groupby(["학교명", "학부·과(전공)명"])["정규화확률"]
+                .rank(method="first", ascending=False)
+                .astype(int)
+            )
 
-        pivoted_final = summed.pivot(
-            index=["학교명", "학부·과(전공)명"],
-            columns="순위",
-            values=["대중소", "정규화확률"],
-        ).sort_index(axis=1, level=1)
+            pivoted_final = summed.pivot(
+                index=["학교명", "학부·과(전공)명"],
+                columns="순위",
+                values=["대중소", "정규화확률"],
+            ).sort_index(axis=1, level=1)
 
-        new_cols = []
-        max_rank = summed["순위"].max()
-        for i in range(1, max_rank + 1):
-            new_cols.append(("대중소", i))
-            new_cols.append(("정규화확률", i))
-        pivoted_final = pivoted_final[new_cols]
+            new_cols = []
+            max_rank = summed["순위"].max()
+            for i in range(1, max_rank + 1):
+                new_cols.append(("대중소", i))
+                new_cols.append(("정규화확률", i))
+            pivoted_final = pivoted_final[new_cols]
 
-        pivoted_final.columns = [
-            f"추천_대중소_{col[1]}순위"
-            if col[0] == "대중소"
-            else f"추천_확률_{col[1]}순위"
-            for col in pivoted_final.columns
-        ]
-        pivoted_final = pivoted_final.reset_index()
+            pivoted_final.columns = [
+                f"추천_대중소_{col[1]}순위"
+                if col[0] == "대중소"
+                else f"추천_확률_{col[1]}순위"
+                for col in pivoted_final.columns
+            ]
+            pivoted_final = pivoted_final.reset_index()
 
-        course_ratio_result_nce = pivoted_final.copy()
+            course_ratio_result_nce = pivoted_final.copy()
 
-        major_recommendation_generation_time = (
-            datetime.now() - major_recommendation_generation_start_time
-        )
-        logger.info(
-            f"전공별 추천 결과 생성 완료 시간: {major_recommendation_generation_time}"
-        )
-        logger.info(f"전체 처리 완료 시간: {datetime.now() - data_loading_start_time}")
+            major_recommendation_generation_time = (
+                datetime.now() - major_recommendation_generation_start_time
+            )
+            logger.info(
+                f"전공별 추천 결과 생성 완료 시간: {major_recommendation_generation_time}"
+            )
+            logger.info(f"전체 처리 완료 시간: {datetime.now() - data_loading_start_time}")
 
-        progress_bar.progress(100)
-        status_text.text("✅ 처리 완료!")
+            progress_bar.progress(100)
+            status_text.text("✅ 처리 완료!")
 
-        # === 결과 표시 ===
-        st.markdown("---")
-        st.header("📊 분석 결과")
+            # === 결과 표시 ===
+            st.markdown("---")
+            st.header("📊 분석 결과")
 
-        # 탭으로 구분
-        tab1, tab2, tab3 = st.tabs(
-            ["📈 통계 정보", "🎯 전공별 추천 결과", "📥 데이터 다운로드"]
-        )
+            # 탭으로 구분
+            tab1, tab2, tab3 = st.tabs(
+                ["📈 통계 정보", "🎯 전공별 추천 결과", "📥 데이터 다운로드"]
+            )
 
-        with tab1:
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("전체 전공 수", f"{len(nce_keys):,}개")
-            with col2:
-                st.metric("NCE 과목 수", f"{len(nce):,}개")
-            with col3:
-                st.metric("추천 결과 생성", f"{len(course_ratio_result_nce):,}건")
-            with col4:
-                st.metric("최대 추천 순위", f"{max_rank}순위")
+            with tab1:
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("전체 전공 수", f"{len(nce_keys):,}개")
+                with col2:
+                    st.metric("NCE 과목 수", f"{len(nce):,}개")
+                with col3:
+                    st.metric("추천 결과 생성", f"{len(course_ratio_result_nce):,}건")
+                with col4:
+                    st.metric("최대 추천 순위", f"{max_rank}순위")
 
-            st.markdown("### 대계열 분포")
-            major_dist = nce["대계열분류"].value_counts()
-            st.bar_chart(major_dist)
+                st.markdown("### 대계열 분포")
+                major_dist = nce["대계열분류"].value_counts()
+                st.bar_chart(major_dist)
 
-        with tab2:
-            st.markdown("### 전공별 표준분류체계 추천 결과")
+            with tab2:
+                st.markdown("### 전공별 표준분류체계 추천 결과")
 
-            # 학교명 필터
-            schools = sorted(course_ratio_result_nce["학교명"].unique())
-            selected_school = st.selectbox("학교 선택", ["전체"] + schools)
+                # 학교명 필터
+                schools = sorted(course_ratio_result_nce["학교명"].unique())
+                selected_school = st.selectbox("학교 선택", ["전체"] + schools)
 
-            # 필터링
-            if selected_school != "전체":
-                display_df = course_ratio_result_nce[
-                    course_ratio_result_nce["학교명"] == selected_school
-                ]
-            else:
-                display_df = course_ratio_result_nce
+                # 필터링
+                if selected_school != "전체":
+                    display_df = course_ratio_result_nce[
+                        course_ratio_result_nce["학교명"] == selected_school
+                    ]
+                else:
+                    display_df = course_ratio_result_nce
 
-            # 표시할 순위 개수 선택
-            num_ranks = st.slider("표시할 추천 순위 개수", 1, 10, 5)
+                # 표시할 순위 개수 선택
+                num_ranks = st.slider("표시할 추천 순위 개수", 1, 10, 5)
 
-            # 표시할 컬럼 선택
-            display_cols = ["학교명", "학부·과(전공)명"]
-            for i in range(1, num_ranks + 1):
-                display_cols.append(f"추천_대중소_{i}순위")
-                display_cols.append(f"추천_확률_{i}순위")
+                # 표시할 컬럼 선택
+                display_cols = ["학교명", "학부·과(전공)명"]
+                for i in range(1, num_ranks + 1):
+                    display_cols.append(f"추천_대중소_{i}순위")
+                    display_cols.append(f"추천_확률_{i}순위")
 
-            display_cols = [col for col in display_cols if col in display_df.columns]
+                display_cols = [col for col in display_cols if col in display_df.columns]
 
-            st.dataframe(display_df[display_cols], use_container_width=True, height=500)
+                st.dataframe(display_df[display_cols], use_container_width=True, height=500)
 
-            st.info(f"📌 총 {len(display_df)}개 전공의 추천 결과")
+                st.info(f"📌 총 {len(display_df)}개 전공의 추천 결과")
 
-        with tab3:
-            st.markdown("### 결과 다운로드")
+            with tab3:
+                st.markdown("### 결과 다운로드")
 
-            # Excel 다운로드 함수
-            def to_excel(df):
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                    df.to_excel(writer, index=False, sheet_name="추천결과")
-                return output.getvalue()
+                # Excel 다운로드 함수
+                def to_excel(df):
+                    output = BytesIO()
+                    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                        df.to_excel(writer, index=False, sheet_name="추천결과")
+                    return output.getvalue()
 
-            col1, col2 = st.columns(2)
+                col1, col2 = st.columns(2)
 
-            with col1:
-                st.markdown("#### 전공별 추천 결과")
-                excel_data = to_excel(course_ratio_result_nce)
-                st.download_button(
-                    label="📥 Excel 다운로드",
-                    data=excel_data,
-                    file_name="nce_전공별_추천결과.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
+                with col1:
+                    st.markdown("#### 전공별 추천 결과")
+                    excel_data = to_excel(course_ratio_result_nce)
+                    st.download_button(
+                        label="📥 Excel 다운로드",
+                        data=excel_data,
+                        file_name="nce_전공별_추천결과.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
 
-            with col2:
-                st.markdown("#### 교육과정별 추천 결과")
-                excel_data2 = to_excel(merged_result)
-                st.download_button(
-                    label="📥 Excel 다운로드",
-                    data=excel_data2,
-                    file_name="nce_교육과정별_추천결과.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
+                with col2:
+                    st.markdown("#### 교육과정별 추천 결과")
+                    excel_data2 = to_excel(merged_result)
+                    st.download_button(
+                        label="📥 Excel 다운로드",
+                        data=excel_data2,
+                        file_name="nce_교육과정별_추천결과.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    )
 
         except Exception as e:
             st.error(f"❌ 오류 발생: {str(e)}")
